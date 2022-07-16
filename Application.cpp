@@ -1,5 +1,4 @@
 #include "Application.h"
-#include <vector>
 
 const uint32_t WINDOW_WIDTH = 800;
 const uint32_t WINDOW_HEIGHT = 600;
@@ -27,8 +26,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 Application::Application()
 {
 	this->window = nullptr;
-	this->instance = nullptr;
-	this->debugMessenger = nullptr;
+	this->instance = VK_NULL_HANDLE;
+	this->debugMessenger = VK_NULL_HANDLE;
+	this->physicalDevice = VK_NULL_HANDLE;
+	this->logicalDevice = VK_NULL_HANDLE;
+	this->graphicsQueue = VK_NULL_HANDLE;
 
 	::memset(&this->debugUtilsMessengerCreateInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
 	this->debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -57,14 +59,14 @@ void Application::InitWindow()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	this->window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan Tutorial", nullptr, nullptr);
-
-
 }
 
 void Application::InitVulkan()
 {
 	this->CreateInstance();
 	this->SetupDebugMessenger();
+	this->PickPhsyicalDevice();
+	this->CreateLogicalDevice();
 }
 
 void Application::MainLoop()
@@ -77,6 +79,8 @@ void Application::MainLoop()
 
 void Application::Cleanup()
 {
+	vkDestroyDevice(this->logicalDevice, nullptr);
+
 	if (enableValidationLayers)
 	{
 		auto vkDestroyDebugUtilsMessangerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(this->instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -88,6 +92,103 @@ void Application::Cleanup()
 
 	glfwDestroyWindow(this->window);
 	glfwTerminate();
+}
+
+void Application::CreateLogicalDevice()
+{
+	QueueFamilyIndices indices = this->FindQueueFamilies(this->physicalDevice);
+
+	float queuePriority = 1.0f;
+
+	VkDeviceQueueCreateInfo queueCreateInfo{};
+	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+	queueCreateInfo.queueCount = 1;
+	queueCreateInfo.pQueuePriorities = &queuePriority;
+
+	VkPhysicalDeviceFeatures deviceFeatures{};
+
+	VkDeviceCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pQueueCreateInfos = &queueCreateInfo;
+	createInfo.queueCreateInfoCount = 1;
+	createInfo.pEnabledFeatures = &deviceFeatures;
+	createInfo.enabledExtensionCount = 0;
+
+	if (enableValidationLayers)
+	{
+		// Not really necessary for newest versions of VK.
+		createInfo.enabledLayerCount = (uint32_t)desiredValidationLayersArray.size();
+		createInfo.ppEnabledLayerNames = desiredValidationLayersArray.data();
+	}
+
+	if (VK_SUCCESS != vkCreateDevice(this->physicalDevice, &createInfo, nullptr, &this->logicalDevice))
+		throw new std::runtime_error("Failed to create logical device!");
+
+	vkGetDeviceQueue(this->logicalDevice, indices.graphicsFamily.value(), 0, &this->graphicsQueue);
+}
+
+void Application::PickPhsyicalDevice()
+{
+	uint32_t deviceCount = 0;
+	vkEnumeratePhysicalDevices(this->instance, &deviceCount, nullptr);
+	if (deviceCount == 0)
+		throw new std::runtime_error("Failed to find GPUs with Vulkan support!");
+
+	std::vector<VkPhysicalDevice> devicesArray(deviceCount);
+	vkEnumeratePhysicalDevices(this->instance, &deviceCount, devicesArray.data());
+
+	VkPhysicalDevice chosenDevice = VK_NULL_HANDLE;
+	for (const auto& candidateDevice : devicesArray)
+	{
+		if (this->IsDeviceSuitable(candidateDevice))
+		{
+			chosenDevice = candidateDevice;
+			break;
+		}
+	}
+
+	if (chosenDevice == VK_NULL_HANDLE)
+		throw new std::runtime_error("Failed to find a suitable GPU!");
+
+	this->physicalDevice = chosenDevice;
+}
+
+bool Application::IsDeviceSuitable(VkPhysicalDevice device)
+{
+	/*VkPhysicalDeviceProperties deviceProperties;
+	vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+	VkPhysicalDeviceFeatures deviceFeatures;
+	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);*/
+
+	QueueFamilyIndices indices = this->FindQueueFamilies(device);
+	
+	return indices.IsComplete();
+}
+
+Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice device)
+{
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+	std::vector<VkQueueFamilyProperties> queueFamiliesArray(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamiliesArray.data());
+
+	QueueFamilyIndices indices;
+
+	int i = 0;
+	for (const auto& queueFamily : queueFamiliesArray)
+	{
+		if (0 != (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+			indices.graphicsFamily = i;
+
+		if (indices.IsComplete())
+			break;
+
+		i++;
+	}
+
+	return indices;
 }
 
 VkBool32 Application::HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData)
