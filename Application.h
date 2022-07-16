@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <stdexcept>
@@ -15,7 +16,10 @@ public:
 	void Run();
 
 private:
+	void InitWindow();
 	void InitVulkan();
 	void MainLoop();
 	void Cleanup();
+
+	GLFWwindow* window;
 };
