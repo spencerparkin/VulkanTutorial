@@ -31,6 +31,8 @@ Application::Application()
 	this->physicalDevice = VK_NULL_HANDLE;
 	this->logicalDevice = VK_NULL_HANDLE;
 	this->graphicsQueue = VK_NULL_HANDLE;
+	this->presentQueue = VK_NULL_HANDLE;
+	this->surface = VK_NULL_HANDLE;
 
 	::memset(&this->debugUtilsMessengerCreateInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
 	this->debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -65,6 +67,7 @@ void Application::InitVulkan()
 {
 	this->CreateInstance();
 	this->SetupDebugMessenger();
+	this->CreateSurface();	// Do this before selecting GPU, because the surface capabilities can influence our GPU choice.
 	this->PickPhsyicalDevice();
 	this->CreateLogicalDevice();
 }
@@ -88,10 +91,17 @@ void Application::Cleanup()
 			vkDestroyDebugUtilsMessangerEXT(this->instance, this->debugMessenger, nullptr);
 	}
 
+	vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
 	vkDestroyInstance(this->instance, nullptr);
 
 	glfwDestroyWindow(this->window);
 	glfwTerminate();
+}
+
+void Application::CreateSurface()
+{
+	if (VK_SUCCESS != glfwCreateWindowSurface(this->instance, this->window, nullptr, &surface))
+		throw new std::runtime_error("Failed to create window surface!");
 }
 
 void Application::CreateLogicalDevice()
@@ -100,18 +110,25 @@ void Application::CreateLogicalDevice()
 
 	float queuePriority = 1.0f;
 
-	VkDeviceQueueCreateInfo queueCreateInfo{};
-	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-	queueCreateInfo.queueCount = 1;
-	queueCreateInfo.pQueuePriorities = &queuePriority;
+	std::vector<VkDeviceQueueCreateInfo> queueCreateInfosArray;
+	std::set<uint32_t> uniqueQueueFamiliesIndexSet = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
+	for (uint32_t queueFamilyIndex : uniqueQueueFamiliesIndexSet)
+	{
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+		queueCreateInfo.queueCount = 1;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfosArray.push_back(queueCreateInfo);
+	}
 
 	VkPhysicalDeviceFeatures deviceFeatures{};
 
 	VkDeviceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.pQueueCreateInfos = &queueCreateInfo;
-	createInfo.queueCreateInfoCount = 1;
+	createInfo.pQueueCreateInfos = queueCreateInfosArray.data();
+	createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfosArray.size();
 	createInfo.pEnabledFeatures = &deviceFeatures;
 	createInfo.enabledExtensionCount = 0;
 
@@ -126,6 +143,7 @@ void Application::CreateLogicalDevice()
 		throw new std::runtime_error("Failed to create logical device!");
 
 	vkGetDeviceQueue(this->logicalDevice, indices.graphicsFamily.value(), 0, &this->graphicsQueue);
+	vkGetDeviceQueue(this->logicalDevice, indices.presentFamily.value(), 0, &this->presentQueue);
 }
 
 void Application::PickPhsyicalDevice()
@@ -181,6 +199,11 @@ Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice 
 	{
 		if (0 != (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
 			indices.graphicsFamily = i;
+
+		VkBool32 presentSupported = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->surface, &presentSupported);
+		if (presentSupported)
+			indices.presentFamily = i;
 
 		if (indices.IsComplete())
 			break;

@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <set>
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
@@ -28,14 +29,17 @@ private:
 	void PickPhsyicalDevice();
 	bool IsDeviceSuitable(VkPhysicalDevice device);
 	void CreateLogicalDevice();
+	void CreateSurface();
 
 	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphicsFamily;
+		std::optional<uint32_t> presentFamily;
 
 		bool IsComplete()
 		{
-			return graphicsFamily.has_value();
+			return this->graphicsFamily.has_value() &&
+				this->presentFamily.has_value();
 		}
 	};
 
@@ -48,6 +52,8 @@ private:
 	VkPhysicalDevice physicalDevice;
 	VkDevice logicalDevice;
 	VkQueue graphicsQueue;
+	VkQueue presentQueue;
+	VkSurfaceKHR surface;
 
 public:
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
