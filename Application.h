@@ -21,5 +21,8 @@ private:
 	void MainLoop();
 	void Cleanup();
 
+	void CreateInstance();
+
 	GLFWwindow* window;
+	VkInstance instance;
 };
