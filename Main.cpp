@@ -38,9 +38,10 @@ int main()
 	{
 		app.Run();
 	}
-	catch (const std::exception& e)
+	catch (std::exception* e)
 	{
-		std::cerr << e.what() << std::endl;
+		std::cerr << e->what() << std::endl;
+		delete e;
 		return EXIT_FAILURE;
 	}
 

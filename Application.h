@@ -22,6 +22,7 @@ private:
 	void Cleanup();
 
 	void CreateInstance();
+	bool CheckValidationLayerSupport();
 
 	GLFWwindow* window;
 	VkInstance instance;
