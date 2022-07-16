@@ -134,7 +134,8 @@ void Application::CreateLogicalDevice()
 	createInfo.pQueueCreateInfos = queueCreateInfosArray.data();
 	createInfo.queueCreateInfoCount = (uint32_t)queueCreateInfosArray.size();
 	createInfo.pEnabledFeatures = &deviceFeatures;
-	createInfo.enabledExtensionCount = 0;
+	createInfo.enabledExtensionCount = (uint32_t)desiredDeviceExtensionsArray.size();
+	createInfo.ppEnabledExtensionNames = desiredDeviceExtensionsArray.data();
 
 	if (enableValidationLayers)
 	{
@@ -188,7 +189,14 @@ bool Application::IsDeviceSuitable(VkPhysicalDevice device)
 	
 	bool extensionsSupported = this->CheckDeviceExtensionsSupport(device);
 
-	return indices.IsComplete() && extensionsSupported;
+	bool swapChainAdequate = false;
+	if (extensionsSupported)
+	{
+		SwapChainSupportDetails details = this->QuerySwapChainSupport(device);
+		swapChainAdequate = !details.formatsArray.empty() && !details.presentModesArray.empty();
+	}
+
+	return indices.IsComplete() && extensionsSupported && swapChainAdequate;
 }
 
 bool Application::CheckDeviceExtensionsSupport(VkPhysicalDevice device)
@@ -233,6 +241,31 @@ Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice 
 	}
 
 	return indices;
+}
+
+Application::SwapChainSupportDetails Application::QuerySwapChainSupport(VkPhysicalDevice device)
+{
+	SwapChainSupportDetails details;
+
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, this->surface, &details.capabilities);
+
+	uint32_t formatCount;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+	if (formatCount != 0)
+	{
+		details.formatsArray.resize(formatCount);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formatsArray.data());
+	}
+
+	uint32_t presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+	if (presentModeCount != 0)
+	{
+		details.presentModesArray.resize(presentModeCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModesArray.data());
+	}
+
+	return details;
 }
 
 VkBool32 Application::HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData)

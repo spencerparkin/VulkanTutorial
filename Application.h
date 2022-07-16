@@ -32,6 +32,15 @@ private:
 	void CreateSurface();
 	bool CheckDeviceExtensionsSupport(VkPhysicalDevice device);
 
+	struct SwapChainSupportDetails
+	{
+		VkSurfaceCapabilitiesKHR capabilities;
+		std::vector<VkSurfaceFormatKHR> formatsArray;
+		std::vector<VkPresentModeKHR> presentModesArray;
+	};
+
+	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
+
 	struct QueueFamilyIndices
 	{
 		std::optional<uint32_t> graphicsFamily;
