@@ -30,6 +30,7 @@ private:
 	bool IsDeviceSuitable(VkPhysicalDevice device);
 	void CreateLogicalDevice();
 	void CreateSurface();
+	bool CheckDeviceExtensionsSupport(VkPhysicalDevice device);
 
 	struct QueueFamilyIndices
 	{

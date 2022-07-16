@@ -7,6 +7,10 @@ const std::vector<const char*> desiredValidationLayersArray = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
+const std::vector<const char*> desiredDeviceExtensionsArray = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
 #ifdef NDEBUG
 const bool enbaleValidationLayers = false;
 #else
@@ -182,7 +186,24 @@ bool Application::IsDeviceSuitable(VkPhysicalDevice device)
 
 	QueueFamilyIndices indices = this->FindQueueFamilies(device);
 	
-	return indices.IsComplete();
+	bool extensionsSupported = this->CheckDeviceExtensionsSupport(device);
+
+	return indices.IsComplete() && extensionsSupported;
+}
+
+bool Application::CheckDeviceExtensionsSupport(VkPhysicalDevice device)
+{
+	uint32_t extensionCount = 0;
+	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+	std::vector<VkExtensionProperties> availableExtensionsArray(extensionCount);
+	vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensionsArray.data());
+
+	std::set<std::string> desiredExtensions(desiredDeviceExtensionsArray.begin(), desiredDeviceExtensionsArray.end());
+
+	for (const auto& extension : availableExtensionsArray)
+		desiredExtensions.erase(extension.extensionName);
+
+	return desiredExtensions.empty();
 }
 
 Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice device)
