@@ -23,7 +23,13 @@ private:
 
 	void CreateInstance();
 	bool CheckValidationLayerSupport();
+	void SetupDebugMessenger();
 
 	GLFWwindow* window;
 	VkInstance instance;
+	VkDebugUtilsMessengerEXT debugMessenger;
+	VkDebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfo;
+
+public:
+	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
 };
