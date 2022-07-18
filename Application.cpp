@@ -56,6 +56,8 @@ Application::Application()
 	this->pipelineLayout = VK_NULL_HANDLE;
 	this->renderPass = VK_NULL_HANDLE;
 	this->graphicsPipeline = VK_NULL_HANDLE;
+	this->commandPool = VK_NULL_HANDLE;
+	this->commandBuffer = VK_NULL_HANDLE;
 
 	::memset(&this->debugUtilsMessengerCreateInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
 	this->debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -98,6 +100,7 @@ void Application::InitVulkan()
 	this->CreateRenderPass();
 	this->CreateGraphicsPipeline();
 	this->CreateFramebuffers();
+	this->CreateCommandPool();
 }
 
 void Application::MainLoop()
@@ -110,6 +113,8 @@ void Application::MainLoop()
 
 void Application::Cleanup()
 {
+	vkDestroyCommandPool(this->logicalDevice, this->commandPool, nullptr);
+
 	for (auto framebuffer : this->swapChainFramebuffers)
 		vkDestroyFramebuffer(this->logicalDevice, framebuffer, nullptr);
 
@@ -579,6 +584,76 @@ void Application::CreateFramebuffers()
 		if (VK_SUCCESS != vkCreateFramebuffer(this->logicalDevice, &framebufferInfo, nullptr, &this->swapChainFramebuffers[i]))
 			throw new std::runtime_error("Failed to create framebuffer!");
 	}
+}
+
+void Application::CreateCommandPool()
+{
+	QueueFamilyIndices queueFamilyIndices = this->FindQueueFamilies(this->physicalDevice);
+
+	VkCommandPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+	if (VK_SUCCESS != vkCreateCommandPool(this->logicalDevice, &poolInfo, nullptr, &commandPool))
+		throw new std::runtime_error("failed to create command pool!");
+}
+
+void Application::CreateCommandBuffer()
+{
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = commandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = 1;
+	if (VK_SUCCESS != vkAllocateCommandBuffers(this->logicalDevice, &allocInfo, &this->commandBuffer))
+		throw new std::runtime_error("Failed to allocate command buffers!");
+}
+
+void Application::RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32_t imageIndex)
+{
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = 0; // Optional
+	beginInfo.pInheritanceInfo = nullptr; // Optional
+	if (VK_SUCCESS != vkBeginCommandBuffer(givenCommandBuffer, &beginInfo))
+		throw new std::runtime_error("Failed to begin recording command buffer!");
+
+	VkRenderPassBeginInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = this->renderPass;
+	renderPassInfo.framebuffer = this->swapChainFramebuffers[imageIndex];
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = this->swapChainExtent;
+
+	VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+	renderPassInfo.clearValueCount = 1;
+	renderPassInfo.pClearValues = &clearColor;
+
+	vkCmdBeginRenderPass(givenCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	vkCmdBindPipeline(givenCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, this->graphicsPipeline);
+
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(this->swapChainExtent.width);
+	viewport.height = static_cast<float>(this->swapChainExtent.height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(givenCommandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = swapChainExtent;
+	vkCmdSetScissor(givenCommandBuffer, 0, 1, &scissor);
+
+	vkCmdDraw(givenCommandBuffer, 3, 1, 0, 0);
+
+	vkCmdEndRenderPass(givenCommandBuffer);
+
+	if (VK_SUCCESS != vkEndCommandBuffer(givenCommandBuffer))
+		throw new std::runtime_error("Failed to record command buffer!");
 }
 
 VkShaderModule Application::CreateShaderModule(const std::vector<char>& code)

@@ -39,6 +39,9 @@ private:
 	void CreateGraphicsPipeline();
 	void CreateRenderPass();
 	void CreateFramebuffers();
+	void CreateCommandPool();
+	void CreateCommandBuffer();
+	void RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32_t imageIndex);
 
 	struct SwapChainSupportDetails
 	{
@@ -85,6 +88,8 @@ private:
 	VkRenderPass renderPass;
 	VkPipeline graphicsPipeline;
 	std::vector<VkFramebuffer> swapChainFramebuffers;
+	VkCommandPool commandPool;
+	VkCommandBuffer commandBuffer;
 
 public:
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
