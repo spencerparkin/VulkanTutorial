@@ -17,6 +17,21 @@ const bool enbaleValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+static std::vector<char> ReadFile(const std::string& filename)
+{
+	std::ifstream file(filename, std::ios::ate | std::ios::binary);
+	if (!file.is_open())
+		throw new std::runtime_error("Failed to open file!");
+
+	size_t fileSize = (size_t)file.tellg();
+	std::vector<char> buffer(fileSize);
+	file.seekg(0);
+	file.read(buffer.data(), fileSize);
+	file.close();
+
+	return buffer;
+}
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -77,6 +92,7 @@ void Application::InitVulkan()
 	this->CreateLogicalDevice();
 	this->CreateSwapChain();
 	this->CreateImageViews();
+	this->CreateGraphicsPipeline();
 }
 
 void Application::MainLoop()
@@ -336,6 +352,49 @@ void Application::CreateImageViews()
 		if (VK_SUCCESS != vkCreateImageView(this->logicalDevice, &createInfo, nullptr, &this->swapChainImageViews[i]))
 			throw new std::runtime_error("Failed to create image view!");
 	}
+}
+
+void Application::CreateGraphicsPipeline()
+{
+	auto vertShaderCode = ReadFile("vert.spv");
+	auto fragShaderCode = ReadFile("frag.spv");
+
+	VkShaderModule vertShaderModule = this->CreateShaderModule(vertShaderCode);
+	VkShaderModule fragShaderModule = this->CreateShaderModule(fragShaderCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+	// TODO: Finish here.
+	//       Left off at: https://vulkan-tutorial.com/en/Drawing_a_triangle/Graphics_pipeline_basics/Fixed_functions
+
+	vkDestroyShaderModule(this->logicalDevice, vertShaderModule, nullptr);
+	vkDestroyShaderModule(this->logicalDevice, fragShaderModule, nullptr);
+}
+
+VkShaderModule Application::CreateShaderModule(const std::vector<char>& code)
+{
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());	// Should already be properly aligned.
+
+	VkShaderModule shaderModule = VK_NULL_HANDLE;
+	if (VK_SUCCESS != vkCreateShaderModule(this->logicalDevice, &createInfo, nullptr, &shaderModule))
+		throw new std::runtime_error("Failed to create shader module!");
+
+	return shaderModule;
 }
 
 Application::QueueFamilyIndices Application::FindQueueFamilies(VkPhysicalDevice device)

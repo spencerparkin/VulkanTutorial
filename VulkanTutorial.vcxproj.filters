@@ -27,4 +27,12 @@
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="shader.vert">
+      <Filter>Source Files</Filter>
+    </Text>
+    <Text Include="shader.frag">
+      <Filter>Source Files</Filter>
+    </Text>
+  </ItemGroup>
 </Project>

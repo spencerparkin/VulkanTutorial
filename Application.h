@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <limits>
 #include <algorithm>
+#include <fstream>
 
 class Application
 {
@@ -35,6 +36,7 @@ private:
 	bool CheckDeviceExtensionsSupport(VkPhysicalDevice device);
 	void CreateSwapChain();
 	void CreateImageViews();
+	void CreateGraphicsPipeline();
 
 	struct SwapChainSupportDetails
 	{
@@ -47,6 +49,7 @@ private:
 	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+	VkShaderModule CreateShaderModule(const std::vector<char>& code);
 
 	struct QueueFamilyIndices
 	{
