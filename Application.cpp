@@ -97,6 +97,7 @@ void Application::InitVulkan()
 	this->CreateImageViews();
 	this->CreateRenderPass();
 	this->CreateGraphicsPipeline();
+	this->CreateFramebuffers();
 }
 
 void Application::MainLoop()
@@ -109,6 +110,9 @@ void Application::MainLoop()
 
 void Application::Cleanup()
 {
+	for (auto framebuffer : this->swapChainFramebuffers)
+		vkDestroyFramebuffer(this->logicalDevice, framebuffer, nullptr);
+
 	vkDestroyPipeline(this->logicalDevice, this->graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(this->logicalDevice, this->pipelineLayout, nullptr);
 	vkDestroyRenderPass(this->logicalDevice, this->renderPass, nullptr);
@@ -551,6 +555,30 @@ void Application::CreateRenderPass()
 	renderPassInfo.pSubpasses = &subpass;
 	if (VK_SUCCESS != vkCreateRenderPass(this->logicalDevice, &renderPassInfo, nullptr, &this->renderPass))
 		throw new std::runtime_error("failed to create render pass!");
+}
+
+void Application::CreateFramebuffers()
+{
+	this->swapChainFramebuffers.resize(this->swapChainImageViews.size());
+
+	for (size_t i = 0; i < this->swapChainImageViews.size(); i++)
+	{
+		VkImageView attachments[] =
+		{
+			this->swapChainImageViews[i]
+		};
+
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = this->renderPass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = attachments;
+		framebufferInfo.width = this->swapChainExtent.width;
+		framebufferInfo.height = this->swapChainExtent.height;
+		framebufferInfo.layers = 1;
+		if (VK_SUCCESS != vkCreateFramebuffer(this->logicalDevice, &framebufferInfo, nullptr, &this->swapChainFramebuffers[i]))
+			throw new std::runtime_error("Failed to create framebuffer!");
+	}
 }
 
 VkShaderModule Application::CreateShaderModule(const std::vector<char>& code)

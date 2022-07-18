@@ -38,6 +38,7 @@ private:
 	void CreateImageViews();
 	void CreateGraphicsPipeline();
 	void CreateRenderPass();
+	void CreateFramebuffers();
 
 	struct SwapChainSupportDetails
 	{
@@ -83,6 +84,7 @@ private:
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
 	VkPipeline graphicsPipeline;
+	std::vector<VkFramebuffer> swapChainFramebuffers;
 
 public:
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
