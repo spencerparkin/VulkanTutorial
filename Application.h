@@ -25,7 +25,6 @@ private:
 	void InitVulkan();
 	void MainLoop();
 	void Cleanup();
-
 	void CreateInstance();
 	bool CheckValidationLayerSupport();
 	void SetupDebugMessenger();
@@ -35,6 +34,7 @@ private:
 	void CreateSurface();
 	bool CheckDeviceExtensionsSupport(VkPhysicalDevice device);
 	void CreateSwapChain();
+	void CreateImageViews();
 
 	struct SwapChainSupportDetails
 	{
@@ -75,6 +75,7 @@ private:
 	std::vector<VkImage> swapChainImages;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
+	std::vector<VkImageView> swapChainImageViews;
 
 public:
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
