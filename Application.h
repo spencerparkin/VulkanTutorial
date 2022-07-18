@@ -8,6 +8,9 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <optional>
+#include <cstdint>
+#include <limits>
+#include <algorithm>
 
 class Application
 {
@@ -31,6 +34,7 @@ private:
 	void CreateLogicalDevice();
 	void CreateSurface();
 	bool CheckDeviceExtensionsSupport(VkPhysicalDevice device);
+	void CreateSwapChain();
 
 	struct SwapChainSupportDetails
 	{
@@ -40,6 +44,9 @@ private:
 	};
 
 	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
+	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+	VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
 	struct QueueFamilyIndices
 	{
@@ -64,6 +71,10 @@ private:
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 	VkSurfaceKHR surface;
+	VkSwapchainKHR swapChain;
+	std::vector<VkImage> swapChainImages;
+	VkFormat swapChainImageFormat;
+	VkExtent2D swapChainExtent;
 
 public:
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
