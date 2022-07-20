@@ -44,6 +44,8 @@ public:
 	void CreateSyncObjects();
 	void RecreateSwapChain();
 	void CleanupSwapChain();
+	void CreateVertexBuffer();
+	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 	struct SwapChainSupportDetails
 	{
@@ -97,6 +99,8 @@ public:
 	std::vector<VkFence> inFlightFence;
 	uint32_t frameCount;
 	bool frameBufferResized;
+	VkBuffer vertexBuffer;
+	VkDeviceMemory vertexBufferMemory;
 
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
 };

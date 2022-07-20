@@ -1,7 +1,47 @@
 #include "Application.h"
+#include <glm/glm.hpp>
+#include <array>
 
 const uint32_t WINDOW_WIDTH = 800;
 const uint32_t WINDOW_HEIGHT = 600;
+
+struct Vertex
+{
+	glm::vec2 pos;
+	glm::vec3 color;
+
+	static VkVertexInputBindingDescription GetBindingDescription()
+	{
+		VkVertexInputBindingDescription bindingDescription{};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(Vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return bindingDescription;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions()
+	{
+		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+		return attributeDescriptions;
+	}
+};
+
+const std::vector<Vertex> vertices = {
+	{{0.1f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
 
 const std::vector<const char*> desiredValidationLayersArray = {
 	"VK_LAYER_KHRONOS_validation"
@@ -67,6 +107,8 @@ Application::Application()
 	this->commandPool = VK_NULL_HANDLE;
 	this->frameCount = 0;
 	this->frameBufferResized = false;
+	this->vertexBuffer = VK_NULL_HANDLE;
+	this->vertexBufferMemory = nullptr;
 
 	::memset(&this->debugUtilsMessengerCreateInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
 	this->debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -111,6 +153,7 @@ void Application::InitVulkan()
 	this->CreateGraphicsPipeline();
 	this->CreateFramebuffers();
 	this->CreateCommandPool();
+	this->CreateVertexBuffer();
 	this->CreateCommandBuffer();
 	this->CreateSyncObjects();
 }
@@ -128,6 +171,9 @@ void Application::MainLoop()
 
 void Application::Cleanup()
 {
+	vkDestroyBuffer(this->logicalDevice, this->vertexBuffer, nullptr);
+	vkFreeMemory(this->logicalDevice, this->vertexBufferMemory, nullptr);		// Now we can free the memory since it is no longer bound.
+
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		vkDestroySemaphore(this->logicalDevice, this->imageAvailableSemaphore[i], nullptr);
@@ -418,6 +464,48 @@ void Application::CreateImageViews()
 	}
 }
 
+void Application::CreateVertexBuffer()
+{
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	if (VK_SUCCESS != vkCreateBuffer(this->logicalDevice, &bufferInfo, nullptr, &this->vertexBuffer))
+		throw new std::runtime_error("Failed to create vertex buffer!");
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(this->logicalDevice, this->vertexBuffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = this->FindMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	if (VK_SUCCESS != vkAllocateMemory(this->logicalDevice, &allocInfo, nullptr, &this->vertexBufferMemory))
+		throw new std::runtime_error("Failed to allocate vertex buffer memory!");
+
+	vkBindBufferMemory(this->logicalDevice, this->vertexBuffer, this->vertexBufferMemory, 0);
+
+	void* data = nullptr;
+	vkMapMemory(this->logicalDevice, this->vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+	::memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+	vkUnmapMemory(this->logicalDevice, this->vertexBufferMemory);
+}
+
+uint32_t Application::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(this->physicalDevice, &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+			return i;
+
+	throw std::runtime_error("failed to find suitable memory type!");
+}
+
 void Application::CreateGraphicsPipeline()
 {
 	auto vertShaderCode = ReadFile("vert.spv");
@@ -463,12 +551,15 @@ void Application::CreateGraphicsPipeline()
 	viewportState.scissorCount = 1;
 	viewportState.pScissors = &scissor;*/
 
+	auto bindingDescription = Vertex::GetBindingDescription();
+	auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.size();
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -696,6 +787,10 @@ void Application::RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32
 
 	vkCmdBindPipeline(givenCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, this->graphicsPipeline);
 
+	VkBuffer vertexBuffersArray[] = { this->vertexBuffer };
+	VkDeviceSize offsetsArray[] = { 0 };
+	vkCmdBindVertexBuffers(givenCommandBuffer, 0, 1, vertexBuffersArray, offsetsArray);
+
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -710,7 +805,7 @@ void Application::RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32
 	scissor.extent = swapChainExtent;
 	vkCmdSetScissor(givenCommandBuffer, 0, 1, &scissor);
 
-	vkCmdDraw(givenCommandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(givenCommandBuffer, vertices.size(), 1, 0, 0);
 
 	vkCmdEndRenderPass(givenCommandBuffer);
 
