@@ -20,8 +20,6 @@ public:
 	virtual ~Application();
 
 	void Run();
-
-private:
 	void InitWindow();
 	void InitVulkan();
 	void MainLoop();
@@ -44,6 +42,8 @@ private:
 	void RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32_t imageIndex);
 	void DrawFrame();
 	void CreateSyncObjects();
+	void RecreateSwapChain();
+	void CleanupSwapChain();
 
 	struct SwapChainSupportDetails
 	{
@@ -96,7 +96,7 @@ private:
 	std::vector<VkSemaphore> renderFinishedSemaphore;
 	std::vector<VkFence> inFlightFence;
 	uint32_t frameCount;
+	bool frameBufferResized;
 
-public:
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
 };

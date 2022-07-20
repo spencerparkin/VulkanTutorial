@@ -44,6 +44,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 	return app->HandleDebugMessage(messageSeverity, messageType, pCallbackData);
 }
 
+static void FrameBufferResizeCallback(GLFWwindow* window, int width, int height)
+{
+	auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+	app->frameBufferResized = true;
+}
+
 Application::Application()
 {
 	this->window = nullptr;
@@ -60,6 +66,7 @@ Application::Application()
 	this->graphicsPipeline = VK_NULL_HANDLE;
 	this->commandPool = VK_NULL_HANDLE;
 	this->frameCount = 0;
+	this->frameBufferResized = false;
 
 	::memset(&this->debugUtilsMessengerCreateInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
 	this->debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -85,9 +92,10 @@ void Application::InitWindow()
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	this->window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan Tutorial", nullptr, nullptr);
+	glfwSetWindowUserPointer(this->window, this);
+	glfwSetFramebufferSizeCallback(this->window, &FrameBufferResizeCallback);
 }
 
 void Application::InitVulkan()
@@ -129,17 +137,12 @@ void Application::Cleanup()
 
 	vkDestroyCommandPool(this->logicalDevice, this->commandPool, nullptr);
 
-	for (auto framebuffer : this->swapChainFramebuffers)
-		vkDestroyFramebuffer(this->logicalDevice, framebuffer, nullptr);
+	this->CleanupSwapChain();
 
 	vkDestroyPipeline(this->logicalDevice, this->graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(this->logicalDevice, this->pipelineLayout, nullptr);
 	vkDestroyRenderPass(this->logicalDevice, this->renderPass, nullptr);
 
-	for (auto imageView : this->swapChainImageViews)
-		vkDestroyImageView(this->logicalDevice, imageView, nullptr);
-
-	vkDestroySwapchainKHR(this->logicalDevice, this->swapChain, nullptr);
 	vkDestroyDevice(this->logicalDevice, nullptr);
 
 	if (enableValidationLayers)
@@ -233,12 +236,6 @@ void Application::PickPhsyicalDevice()
 
 bool Application::IsDeviceSuitable(VkPhysicalDevice device)
 {
-	/*VkPhysicalDeviceProperties deviceProperties;
-	vkGetPhysicalDeviceProperties(device, &deviceProperties);
-
-	VkPhysicalDeviceFeatures deviceFeatures;
-	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);*/
-
 	QueueFamilyIndices indices = this->FindQueueFamilies(device);
 	
 	bool extensionsSupported = this->CheckDeviceExtensionsSupport(device);
@@ -303,6 +300,42 @@ VkExtent2D Application::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabil
 		actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 		return actualExtent;
 	}
+}
+
+void Application::RecreateSwapChain()
+{
+	int width = 0, height = 0;
+	glfwGetFramebufferSize(window, &width, &height);
+	while (width == 0 || height == 0)
+	{
+		glfwGetFramebufferSize(window, &width, &height);
+		glfwWaitEvents();
+	}
+
+	vkDeviceWaitIdle(this->logicalDevice);
+
+	this->CleanupSwapChain();
+
+	this->CreateSwapChain();
+	this->CreateImageViews();
+	this->CreateFramebuffers();
+}
+
+void Application::CleanupSwapChain()
+{
+	for (auto framebuffer : this->swapChainFramebuffers)
+		vkDestroyFramebuffer(this->logicalDevice, framebuffer, nullptr);
+
+	this->swapChainFramebuffers.clear();
+
+	for (auto imageView : this->swapChainImageViews)
+		vkDestroyImageView(this->logicalDevice, imageView, nullptr);
+
+	this->swapChainImages.clear();
+
+	vkDestroySwapchainKHR(this->logicalDevice, this->swapChain, nullptr);
+
+	this->swapChain = VK_NULL_HANDLE;
 }
 
 void Application::CreateSwapChain()
@@ -718,12 +751,21 @@ void Application::DrawFrame()
 	// Wait for previous frame to finish.  Note that the fence was created signaled, so we don't wait before doing the first ever frame.
 	vkWaitForFences(this->logicalDevice, 1, &this->inFlightFence[i], VK_TRUE, UINT64_MAX);
 
-	vkResetFences(this->logicalDevice, 1, &this->inFlightFence[i]);
-
 	// Passed in semaphore is signaled when the "presentation engine" is finished using the image.
 	// The returned image index is the image in the swap chain we created that is ready for us to render into.
 	uint32_t imageIndex = 0;
-	vkAcquireNextImageKHR(this->logicalDevice, this->swapChain, UINT64_MAX, this->imageAvailableSemaphore[i], VK_NULL_HANDLE, &imageIndex);
+	VkResult result = vkAcquireNextImageKHR(this->logicalDevice, this->swapChain, UINT64_MAX, this->imageAvailableSemaphore[i], VK_NULL_HANDLE, &imageIndex);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		this->RecreateSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+		throw new std::runtime_error("Faield to acquire swap chain image!");
+
+	// Only reset if we know we're going to submit work that will signal the fence.
+	vkResetFences(this->logicalDevice, 1, &this->inFlightFence[i]);
 
 	vkResetCommandBuffer(this->commandBuffer[i], 0);
 	this->RecordCommandBuffer(this->commandBuffer[i], imageIndex);
@@ -755,7 +797,14 @@ void Application::DrawFrame()
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = nullptr; // Optional
 
-	vkQueuePresentKHR(this->presentQueue, &presentInfo);
+	result = vkQueuePresentKHR(this->presentQueue, &presentInfo);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || this->frameBufferResized)
+	{
+		this->frameBufferResized = false;
+		this->RecreateSwapChain();
+	}
+	else if (result != VK_SUCCESS)
+		throw new std::runtime_error("Failed to present swap chain image!");
 }
 
 VkShaderModule Application::CreateShaderModule(const std::vector<char>& code)
