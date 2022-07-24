@@ -37,14 +37,16 @@ public:
 	void CreateGraphicsPipeline();
 	void CreateRenderPass();
 	void CreateFramebuffers();
-	void CreateCommandPool();
-	void CreateCommandBuffer();
+	void CreateCommandPools();
+	void CreateCommandBuffers();
 	void RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32_t imageIndex);
 	void DrawFrame();
 	void CreateSyncObjects();
 	void RecreateSwapChain();
 	void CleanupSwapChain();
 	void CreateVertexBuffer();
+	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 	struct SwapChainSupportDetails
@@ -64,11 +66,13 @@ public:
 	{
 		std::optional<uint32_t> graphicsFamily;
 		std::optional<uint32_t> presentFamily;
+		std::optional<uint32_t> transferFamily;
 
 		bool IsComplete()
 		{
 			return this->graphicsFamily.has_value() &&
-				this->presentFamily.has_value();
+				this->presentFamily.has_value() &&
+				this->transferFamily.has_value();
 		}
 	};
 
@@ -82,6 +86,7 @@ public:
 	VkDevice logicalDevice;
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+	VkQueue transferQueue;
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
 	std::vector<VkImage> swapChainImages;
@@ -92,7 +97,8 @@ public:
 	VkRenderPass renderPass;
 	VkPipeline graphicsPipeline;
 	std::vector<VkFramebuffer> swapChainFramebuffers;
-	VkCommandPool commandPool;
+	VkCommandPool graphicsCommandPool;
+	VkCommandPool transferCommandPool;
 	std::vector<VkCommandBuffer> commandBuffer;
 	std::vector<VkSemaphore> imageAvailableSemaphore;
 	std::vector<VkSemaphore> renderFinishedSemaphore;
