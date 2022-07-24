@@ -45,6 +45,8 @@ public:
 	void RecreateSwapChain();
 	void CleanupSwapChain();
 	void CreateVertexBuffer();
+	void CreateIndexBuffer();
+	void CreateGeneralBuffer(const void* bufferData, VkDeviceSize bufferSize, VkBufferUsageFlags usageFlags, VkBuffer& targetBuffer, VkDeviceMemory& targetBufferMemory);
 	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -107,6 +109,8 @@ public:
 	bool frameBufferResized;
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexBufferMemory;
 
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
 };

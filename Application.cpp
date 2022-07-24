@@ -38,9 +38,14 @@ struct Vertex
 };
 
 const std::vector<Vertex> vertices = {
-	{{0.1f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+	0, 1, 2, 2, 3, 0
 };
 
 const std::vector<const char*> desiredValidationLayersArray = {
@@ -111,6 +116,8 @@ Application::Application()
 	this->frameBufferResized = false;
 	this->vertexBuffer = VK_NULL_HANDLE;
 	this->vertexBufferMemory = nullptr;
+	this->indexBuffer = VK_NULL_HANDLE;
+	this->indexBufferMemory = nullptr;
 
 	::memset(&this->debugUtilsMessengerCreateInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
 	this->debugUtilsMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -156,6 +163,7 @@ void Application::InitVulkan()
 	this->CreateFramebuffers();
 	this->CreateCommandPools();
 	this->CreateVertexBuffer();
+	this->CreateIndexBuffer();
 	this->CreateCommandBuffers();
 	this->CreateSyncObjects();
 }
@@ -175,6 +183,9 @@ void Application::Cleanup()
 {
 	vkDestroyBuffer(this->logicalDevice, this->vertexBuffer, nullptr);
 	vkFreeMemory(this->logicalDevice, this->vertexBufferMemory, nullptr);		// Now we can free the memory since it is no longer bound.
+
+	vkDestroyBuffer(this->logicalDevice, this->indexBuffer, nullptr);
+	vkFreeMemory(this->logicalDevice, this->vertexBufferMemory, nullptr);
 
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
@@ -472,23 +483,31 @@ void Application::CreateImageViews()
 	}
 }
 
+void Application::CreateIndexBuffer()
+{
+	this->CreateGeneralBuffer(indices.data(), sizeof(indices[0]) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, this->indexBuffer, this->indexBufferMemory);
+}
+
 void Application::CreateVertexBuffer()
 {
-	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+	this->CreateGeneralBuffer(vertices.data(), sizeof(vertices[0]) * vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, this->vertexBuffer, this->vertexBufferMemory);
+}
 
+void Application::CreateGeneralBuffer(const void* bufferData, VkDeviceSize bufferSize, VkBufferUsageFlags usageFlags, VkBuffer& targetBuffer, VkDeviceMemory& targetBufferMemory)
+{
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
 	this->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
 	void* data = nullptr;
 	vkMapMemory(this->logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-	::memcpy(data, vertices.data(), (size_t)bufferSize);
+	::memcpy(data, bufferData, (size_t)bufferSize);
 	vkUnmapMemory(this->logicalDevice, stagingBufferMemory);
 
 	// Can't use vkMapMemory on this buffer, because it is only GPU accessible and therefore quicker access for the GPU.
-	this->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, this->vertexBuffer, this->vertexBufferMemory);
+	this->CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | usageFlags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, targetBuffer, targetBufferMemory);
 
-	this->CopyBuffer(stagingBuffer, this->vertexBuffer, bufferSize);
+	this->CopyBuffer(stagingBuffer, targetBuffer, bufferSize);
 
 	vkDestroyBuffer(this->logicalDevice, stagingBuffer, nullptr);
 	vkFreeMemory(this->logicalDevice, stagingBufferMemory, nullptr);
@@ -548,6 +567,10 @@ void Application::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMe
 	allocInfo.allocationSize = memRequirements.size;
 	allocInfo.memoryTypeIndex = this->FindMemoryType(memRequirements.memoryTypeBits, properties);
 
+	// Note that the tutorial says that in practice, you should not call vkAllocateMemory for every
+	// single resource (e.g., buffer), because it can only be called a limited number of times.
+	// Rather, you should allocate a big huge chunk up front, and then manage the memory yourself
+	// as you create buffers and other things.  Look at VulkanMemoryAllocator for help doing this.
 	if (VK_SUCCESS != vkAllocateMemory(this->logicalDevice, &allocInfo, nullptr, &bufferMemory))
 		throw new std::runtime_error("Failed to allocate buffer memory!");
 
@@ -560,7 +583,7 @@ uint32_t Application::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags 
 	vkGetPhysicalDeviceMemoryProperties(this->physicalDevice, &memProperties);
 
 	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-		if (typeFilter & (1 << i) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		if (0 != (typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
 			return i;
 
 	throw std::runtime_error("failed to find suitable memory type!");
@@ -859,6 +882,8 @@ void Application::RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32
 	VkDeviceSize offsetsArray[] = { 0 };
 	vkCmdBindVertexBuffers(givenCommandBuffer, 0, 1, vertexBuffersArray, offsetsArray);
 
+	vkCmdBindIndexBuffer(givenCommandBuffer, this->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
 	VkViewport viewport{};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -873,7 +898,7 @@ void Application::RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32
 	scissor.extent = swapChainExtent;
 	vkCmdSetScissor(givenCommandBuffer, 0, 1, &scissor);
 
-	vkCmdDraw(givenCommandBuffer, (uint32_t)vertices.size(), 1, 0, 0);
+	vkCmdDrawIndexed(givenCommandBuffer, (uint32_t)indices.size(), 1, 0, 0, 0);
 
 	vkCmdEndRenderPass(givenCommandBuffer);
 
