@@ -2,6 +2,7 @@
 
 #define GLFW_INCLUDE_VULKAN
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -62,6 +63,7 @@ public:
 	void CreateUniformBuffer();
 	void UpdateUniformBuffer(uint32_t i);
 
+	// Note that we must satisfy Vulkan's alignment requirements here.
 	struct UniformBufferObject
 	{
 		glm::mat4 model;
