@@ -1,7 +1,13 @@
 #pragma once
 
 #define GLFW_INCLUDE_VULKAN
+#define GLM_FORCE_RADIANS
+
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <array>
+#include <chrono>
 #include <vector>
 #include <set>
 #include <iostream>
@@ -39,7 +45,7 @@ public:
 	void CreateFramebuffers();
 	void CreateCommandPools();
 	void CreateCommandBuffers();
-	void RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32_t imageIndex);
+	void RecordCommandBuffer(VkCommandBuffer givenCommandBuffer, uint32_t imageIndex, uint32_t i);
 	void DrawFrame();
 	void CreateSyncObjects();
 	void RecreateSwapChain();
@@ -50,6 +56,18 @@ public:
 	void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+	void CreateDescriptorSetLayout();
+	void CreateDescriptorPool();
+	void CreateDescriptorSets();
+	void CreateUniformBuffer();
+	void UpdateUniformBuffer(uint32_t i);
+
+	struct UniformBufferObject
+	{
+		glm::mat4 model;
+		glm::mat4 view;
+		glm::mat4 proj;
+	};
 
 	struct SwapChainSupportDetails
 	{
@@ -97,6 +115,7 @@ public:
 	std::vector<VkImageView> swapChainImageViews;
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
+	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipeline graphicsPipeline;
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	VkCommandPool graphicsCommandPool;
@@ -111,6 +130,10 @@ public:
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
+	std::vector<VkBuffer> uniformBuffers;
+	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	VkDescriptorPool descriptorPool;
+	std::vector<VkDescriptorSet> descriptorSets;
 
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
 };
