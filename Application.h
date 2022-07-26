@@ -68,6 +68,9 @@ public:
 	void EndSingleTimeCommands(VkCommandBuffer commandBuffer, VkCommandPool commandPool, VkQueue queue);
 	void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	void CreateTextureImageView();
+	VkImageView CreateImageView(VkImage image, VkFormat format);
+	void CreateTextureSampler();
 
 	// Note that we must satisfy Vulkan's alignment requirements here.
 	struct UniformBufferObject
@@ -144,6 +147,8 @@ public:
 	std::vector<VkDescriptorSet> descriptorSets;
 	VkImage textureImage;
 	VkDeviceMemory textureImageMemory;
+	VkImageView textureImageView;
+	VkSampler textureSampler;
 
 	VkBool32 HandleDebugMessage(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData);
 };
